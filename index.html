@@ -1,1 +1,390 @@
 
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#173e30">
+<title>Benim Bütçem</title>
+<style>
+* { box-sizing: border-box; }
+body {
+  margin: 0; padding: 18px;
+  background: #f2f5f3; color: #172820;
+  font-family: Arial, sans-serif;
+}
+main { max-width: 520px; margin: auto; }
+h1 { margin-bottom: 4px; }
+.muted { color: #6b7a71; font-size: 13px; }
+.panel {
+  background: white; padding: 17px;
+  border-radius: 16px; margin: 15px 0;
+  box-shadow: 0 2px 8px #173e300a;
+}
+.balance {
+  background: #173e30; color: white;
+  border-radius: 16px; padding: 21px;
+}
+.balance h2 { font-size: 30px; margin: 10px 0; }
+.stats {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 10px; margin-top: 16px;
+}
+.stat {
+  padding: 12px; background: #ffffff17;
+  border-radius: 10px; overflow-wrap: anywhere;
+}
+.stat strong { display: block; margin-top: 6px; }
+label { display: block; margin: 12px 0 6px; }
+input, select, button {
+  width: 100%; padding: 13px;
+  border: 1px solid #d8e1da; border-radius: 10px;
+  background: white; font-size: 16px;
+}
+button {
+  background: #216b4b; color: white;
+  border: 0; margin-top: 12px; font-weight: bold;
+}
+button:active { opacity: .8; }
+.row {
+  display: flex; align-items: center; gap: 10px;
+}
+.row > div { min-width: 0; flex: 1; }
+.category {
+  padding: 12px 0; border-bottom: 1px solid #edf0ed;
+}
+.icon { font-size: 24px; width: 35px; text-align: center; }
+.amount { font-weight: bold; text-align: right; }
+.bar {
+  height: 7px; border-radius: 8px;
+  background: #e9efeb; margin-top: 9px; overflow: hidden;
+}
+.fill { height: 100%; background: #31966a; border-radius: 8px; }
+.item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 12px 0; border-bottom: 1px solid #edf0ed;
+}
+.item-info { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.item button {
+  width: auto; margin: 0; padding: 8px 10px;
+  background: #fbe9e9; color: #9e2828;
+}
+.empty { color: #6b7a71; padding: 12px 0; }
+</style>
+</head>
+<body>
+<main>
+  <h1>💰 Benim Bütçem</h1>
+  <p class="muted">Gelirlerini, giderlerini ve birikimini takip et.</p>
+
+  <section class="balance">
+    <div>Kalan para</div>
+    <h2 id="kalan">0,00 TL</h2>
+    <div id="ozet">Gelir: 0,00 TL · Gider: 0,00 TL</div>
+    <div class="stats">
+      <div class="stat">🟢 Toplam gelir<strong id="gelir">0,00 TL</strong></div>
+      <div class="stat">🔴 Toplam gider<strong id="gider">0,00 TL</strong></div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h3>➕ Yeni işlem</h3>
+    <form id="form">
+      <label for="tur">İşlem türü</label>
+      <select id="tur">
+        <option value="gelir">🟢 Gelir</option>
+        <option value="gider">🔴 Gider</option>
+      </select>
+
+      <label for="tutar">Tutar (TL)</label>
+      <input id="tutar" type="text" inputmode="decimal"
+        placeholder="Örn. 10.000,00" autocomplete="off" required>
+
+      <label for="kategori">Kategori</label>
+      <select id="kategori"></select>
+
+      <label for="tarih">Tarih</label>
+      <input id="tarih" type="date" required>
+
+      <label for="aciklama">Açıklama (isteğe bağlı)</label>
+      <input id="aciklama" type="text" maxlength="100"
+        placeholder="Örn. Aylık market alışverişi">
+
+      <button type="submit">İşlemi kaydet</button>
+    </form>
+  </section>
+
+  <section class="panel">
+    <h3>📊 Kategori harcamaları</h3>
+    <label for="ay">Harcama ayı</label>
+    <input type="month" id="ay">
+    <p class="muted">Seçilen ayın gider dağılımı</p>
+    <div id="kategoriler"></div>
+  </section>
+
+  <section class="panel">
+    <h3>📋 İşlem geçmişi</h3>
+    <label for="filtre">İşlem türü</label>
+    <select id="filtre">
+      <option value="hepsi">Tüm işlemler</option>
+      <option value="gelir">Yalnızca gelirler</option>
+      <option value="gider">Yalnızca giderler</option>
+    </select>
+    <div id="liste"></div>
+  </section>
+</main>
+
+<script>
+const kategoriler = {
+  gelir: [
+    ["Maaş", "💵"], ["Ek gelir", "💼"],
+    ["Diğer gelir", "➕"]
+  ],
+  gider: [
+    ["Market", "🛒"], ["Yemek", "🍽️"],
+    ["Fatura", "⚡"], ["Kredi", "🏦"],
+    ["Kredi kartı", "💳"], ["Ulaşım", "🚗"],
+    ["Sağlık", "🩺"], ["Ev", "🏠"],
+    ["Alışveriş", "🛍️"], ["Eğlence", "🎮"],
+    ["Yatırım", "📈"], ["Diğer", "📌"]
+  ]
+};
+
+const $ = id => document.getElementById(id);
+const simge = ad => {
+  for (const grup of Object.values(kategoriler)) {
+    const bulunan = grup.find(k => k[0] === ad);
+    if (bulunan) return bulunan[1];
+  }
+  return "📌";
+};
+
+const tl = n => n.toLocaleString("tr-TR", {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2
+}) + " TL";
+
+function sayiOku(metin) {
+  let s = metin.trim().replace(/\s/g, "");
+  if (!s) return NaN;
+
+  if (s.includes(",")) {
+    s = s.replace(/\./g, "").replace(",", ".");
+  } else if (/^\d{1,3}(\.\d{3})+$/.test(s)) {
+    s = s.replace(/\./g, "");
+  }
+
+  if (!/^\d+(\.\d{1,2})?$/.test(s)) return NaN;
+  return Number(s);
+}
+
+function paraGirisiniDuzenle() {
+  const alan = $("tutar");
+  const deger = sayiOku(alan.value);
+  if (Number.isFinite(deger) && alan.value.trim() !== "") {
+    alan.value = deger.toLocaleString("tr-TR", {
+      maximumFractionDigits: 2
+    });
+  }
+}
+
+$("tutar").addEventListener("blur", paraGirisiniDuzenle);
+
+let islemler = [];
+try {
+  const kayit = JSON.parse(localStorage.getItem("butce-islemleri") || "[]");
+  if (Array.isArray(kayit)) {
+    islemler = kayit.filter(x =>
+      x && typeof x.tutar === "number" &&
+      Number.isFinite(x.tutar) &&
+      (x.tur === "gelir" || x.tur === "gider")
+    );
+  }
+} catch {
+  islemler = [];
+}
+
+const bugun = new Date();
+const bugunStr = [
+  bugun.getFullYear(),
+  String(bugun.getMonth() + 1).padStart(2, "0"),
+  String(bugun.getDate()).padStart(2, "0")
+].join("-");
+
+$("tarih").value = bugunStr;
+$("ay").value = bugunStr.slice(0, 7);
+
+function kategoriSecenekleriniYenile() {
+  const eski = $("kategori").value;
+  const tur = $("tur").value;
+  $("kategori").replaceChildren();
+
+  kategoriler[tur].forEach(([ad, emoji]) => {
+    const op = document.createElement("option");
+    op.value = ad;
+    op.textContent = emoji + " " + ad;
+    $("kategori").appendChild(op);
+  });
+
+  if (kategoriler[tur].some(k => k[0] === eski)) {
+    $("kategori").value = eski;
+  }
+}
+
+$("tur").addEventListener("change", kategoriSecenekleriniYenile);
+
+function kaydet() {
+  try {
+    localStorage.setItem("butce-islemleri", JSON.stringify(islemler));
+    ciz();
+  } catch {
+    alert("Kayıt yapılamadı. Tarayıcı depolama alanını kontrol et.");
+  }
+}
+
+function eleman(etiket, metin, sinif) {
+  const e = document.createElement(etiket);
+  if (metin !== undefined) e.textContent = metin;
+  if (sinif) e.className = sinif;
+  return e;
+}
+
+function ciz() {
+  const gelir = islemler
+    .filter(x => x.tur === "gelir")
+    .reduce((s, x) => s + x.tutar, 0);
+  const gider = islemler
+    .filter(x => x.tur === "gider")
+    .reduce((s, x) => s + x.tutar, 0);
+
+  $("kalan").textContent = tl(gelir - gider);
+  $("gelir").textContent = tl(gelir);
+  $("gider").textContent = tl(gider);
+  $("ozet").textContent = `Gelir: ${tl(gelir)} · Gider: ${tl(gider)}`;
+
+  const ay = $("ay").value;
+  const aylikGiderler = islemler.filter(x =>
+    x.tur === "gider" && x.tarih.startsWith(ay)
+  );
+  const toplam = aylikGiderler.reduce((s, x) => s + x.tutar, 0);
+  const gruplar = {};
+
+  aylikGiderler.forEach(x => {
+    gruplar[x.kategori] = (gruplar[x.kategori] || 0) + x.tutar;
+  });
+
+  const alan = $("kategoriler");
+  alan.replaceChildren();
+
+  if (!ay) {
+    alan.appendChild(eleman("p", "Harcama ayı seç.", "empty"));
+  } else if (!aylikGiderler.length) {
+    alan.appendChild(eleman("p", "Bu ay henüz gider kaydı yok.", "empty"));
+  } else {
+    Object.entries(gruplar)
+      .sort((a, b) => b[1] - a[1])
+      .forEach(([ad, tutar]) => {
+        const satir = eleman("div", undefined, "category");
+        const ust = eleman("div", undefined, "row");
+        ust.appendChild(eleman("span", simge(ad), "icon"));
+
+        const bilgi = eleman("div");
+        bilgi.appendChild(eleman("strong", ad));
+        bilgi.appendChild(eleman("div",
+          "%" + (tutar / toplam * 100).toLocaleString("tr-TR", {
+            maximumFractionDigits: 1
+          }) + " · toplam gider içindeki payı",
+          "muted"
+        ));
+        ust.appendChild(bilgi);
+        ust.appendChild(eleman("div", tl(tutar), "amount"));
+        satir.appendChild(ust);
+
+        const bar = eleman("div", undefined, "bar");
+        const dolgu = eleman("div", undefined, "fill");
+        dolgu.style.width = (tutar / toplam * 100) + "%";
+        bar.appendChild(dolgu);
+        satir.appendChild(bar);
+        alan.appendChild(satir);
+      });
+
+    alan.appendChild(eleman("p", "Aylık toplam gider: " + tl(toplam)));
+  }
+
+  const liste = $("liste");
+  liste.replaceChildren();
+
+  const gorunen = [...islemler].reverse().filter(x =>
+    $("filtre").value === "hepsi" || x.tur === $("filtre").value
+  );
+
+  if (!gorunen.length) {
+    liste.appendChild(eleman("p", "Henüz işlem yok.", "empty"));
+  }
+
+  gorunen.forEach(x => {
+    const satir = eleman("div", undefined, "item");
+    satir.appendChild(eleman("span", simge(x.kategori), "icon"));
+
+    const bilgi = eleman("div", undefined, "item-info");
+    bilgi.appendChild(eleman("strong", x.kategori));
+    bilgi.appendChild(eleman("div",
+      `${x.tarih} · ${x.tur === "gelir" ? "Gelir" : "Gider"}`,
+      "muted"
+    ));
+    if (x.aciklama) bilgi.appendChild(eleman("div", x.aciklama, "muted"));
+    satir.appendChild(bilgi);
+
+    const miktar = (x.tur === "gelir" ? "+" : "−") + tl(x.tutar);
+    satir.appendChild(eleman("strong", miktar, "amount"));
+
+    const sil = eleman("button", "Sil");
+    sil.type = "button";
+    sil.setAttribute("aria-label", x.kategori + " işlemini sil");
+    sil.addEventListener("click", () => {
+      if (confirm("Bu işlemi silmek istiyor musun?")) {
+        islemler = islemler.filter(y => y.id !== x.id);
+        kaydet();
+      }
+    });
+    satir.appendChild(sil);
+    liste.appendChild(satir);
+  });
+}
+
+$("form").addEventListener("submit", e => {
+  e.preventDefault();
+  const tutar = sayiOku($("tutar").value);
+
+  if (!Number.isFinite(tutar) || tutar <= 0) {
+    alert("Geçerli bir tutar gir. Örnek: 10.000,00");
+    return;
+  }
+  if (!$("tarih").value) {
+    alert("Lütfen tarih seç.");
+    return;
+  }
+
+  islemler.push({
+    id: Date.now() + Math.random(),
+    tur: $("tur").value,
+    tutar: Math.round(tutar * 100) / 100,
+    kategori: $("kategori").value,
+    tarih: $("tarih").value,
+    aciklama: $("aciklama").value.trim()
+  });
+
+  kaydet();
+  e.target.reset();
+  $("tarih").value = bugunStr;
+  kategoriSecenekleriniYenile();
+});
+
+$("ay").addEventListener("change", ciz);
+$("filtre").addEventListener("change", ciz);
+
+kategoriSecenekleriniYenile();
+ciz();
+</script>
+</body>
+</html>
