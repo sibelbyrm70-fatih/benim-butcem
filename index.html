@@ -1,6 +1,8 @@
 
 <!DOCTYPE html>
 <html lang="tr">
+  <link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#2563eb">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -8,6 +10,13 @@
 <title>Benim Bütçem</title>
 <style>
 * { box-sizing: border-box; }
+  <script>
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./sw.js");
+  });
+}
+</script>
 body {
   margin: 0; padding: 18px;
   background: #f2f5f3; color: #172820;
